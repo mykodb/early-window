@@ -1,0 +1,98 @@
+plugins {
+    id 'java-library'
+}
+
+group = project.findProperty('group') ?: 'cn.mykodb'
+version = project.findProperty('version') ?: '1.0.0'
+
+// 编译期只依赖 FML early display / loader 的 API。这些类在运行时由 NeoForge 的 SERVICE 层提供，
+// 绝不能打进 provider jar —— 否则会出现 "reads more than one module named fml_earlydisplay"。
+repositories {
+    mavenCentral()
+    maven {
+        name = 'NeoForged'
+        url = uri('https://maven.neoforged.net/releases')
+    }
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+dependencies {
+    def fml = project.findProperty('fml_version')
+    def lwjgl = project.findProperty('lwjgl_version')
+    def slf4j = project.findProperty('slf4j_version')
+
+    // transitive = false：只需要这些 jar 里的类型，运行期由 FML 提供；
+    // 关掉传递依赖可避免把 modlauncher / night-config 等运行时库拉进构建。
+    compileOnly("net.neoforged.fancymodloader:earlydisplay:${fml}") { transitive = false }
+    compileOnly("net.neoforged.fancymodloader:loader:${fml}") { transitive = false }
+    compileOnly("org.lwjgl:lwjgl:${lwjgl}") { transitive = false }
+    compileOnly("org.lwjgl:lwjgl-opengl:${lwjgl}") { transitive = false }
+    compileOnly("org.slf4j:slf4j-api:${slf4j}") { transitive = false }
+}
+
+// 纯排版断言用的 source set：只依赖本项目的 class 输出，不需要 GL 上下文，
+// 因此可以在无显卡的 CI 上跑；也不会进入 provider jar。
+sourceSets {
+    layoutCheck {
+        java.srcDir 'src/layoutcheck/java'
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+
+// 排版/纯函数断言要加载 TerminalScreen，它的 static 初始化会碰 slf4j LoggerFactory。
+dependencies {
+    layoutCheckRuntimeOnly "org.slf4j:slf4j-api:${project.findProperty('slf4j_version')}"
+}
+
+tasks.named('jar', Jar) {
+    archiveBaseName = 'early-window'
+    from sourceSets.main.output
+    manifest {
+        attributes(
+            'Implementation-Title': 'Early Window',
+            'Implementation-Version': project.version,
+            'Automatic-Module-Name': "${project.group}.earlywindow"
+        )
+    }
+}
+
+tasks.register('checkLayout', JavaExec) {
+    group = 'verification'
+    description = '不依赖 GL 的排版断言（面板越界、进度条压页脚、标签列错位等）'
+    classpath = sourceSets.layoutCheck.runtimeClasspath
+    mainClass = 'cn.mykodb.earlywindow.check.LayoutCheck'
+    dependsOn tasks.named('layoutCheckClasses'), tasks.named('classes')
+}
+
+tasks.named('check') {
+    dependsOn 'checkLayout'
+}
+
+// 发布物：一个 zip，里面是 mods/ 下的 provider jar、config/fml.toml 示例和 README。
+tasks.register('dist', Zip) {
+    group = 'distribution'
+    description = '打包发布 zip（provider jar + fml.toml 示例 + README）'
+    archiveFileName = "early-window-${project.version}.zip"
+    destinationDirectory = layout.buildDirectory.dir('distributions')
+    from(tasks.named('jar')) {
+        into 'mods'
+    }
+    from('packaging/fml.toml') {
+        into 'config'
+    }
+    from 'README.md'
+}
+
+// 拷进开发实例（graft 项目的 run/mods）用；纯构建不需要它。
+tasks.register('installToGraftDev', Copy) {
+    group = 'graft'
+    description = '把 provider jar 复制到 ../graft/run/mods（本地开发用）'
+    from tasks.named('jar')
+    into file('../graft/run/mods')
+}

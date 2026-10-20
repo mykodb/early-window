@@ -1,0 +1,17 @@
+# FML 配置文件示例：把下面这几项合并进实例的 config/fml.toml 即可。
+# 没有这个文件时 FML 会自己生成默认值，所以只改关键项也行。
+
+# 接管早期加载窗口的 provider 名字（本插件）
+earlyWindowProvider = "earlywindow"
+
+# 必须保持 true，否则 FML 不会加载任何 early window provider
+earlyWindowControl = true
+
+# 逻辑画布尺寸；界面按 854x480 排版，其它尺寸会被 letterbox 缩放
+earlyWindowWidth = 854
+earlyWindowHeight = 480
+earlyWindowFBScale = 1
+earlyWindowMaximized = false
+
+# NeoForge 自带的彩蛋（多一只松鼠），与本插件无关
+earlyWindowSquir = false
