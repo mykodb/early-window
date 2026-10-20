@@ -51,13 +51,6 @@ Loading ImmediateWindowProvider earlywindow
 
 依赖只在编译期使用，jar 内不含任何第三方 class；首次构建需要联网解析依赖，之后可离线。
 
-## 与 graft 模组配合开发
-
-```fish
-./gradlew installToGraftDev     # 复制到 ../graft/run/mods
-cd ../graft && ./gradlew runClient
-```
-
 ## 文档
 
 - [实现说明](docs/design.md)：工作原理、渲染与断言、版本兼容、调试手段
